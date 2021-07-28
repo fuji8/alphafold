@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Docker launch script for Alphafold docker image."""
+"""Singularity launch script for Alphafold singularity image."""
 
 import os
+from posix import environ
 import signal
-from typing import Tuple
+from typing import List, Tuple
 
 from absl import app
 from absl import flags
 from absl import logging
-import singularity
-from spython.main import run
+from spython.main import execute
 
 
 #### USER CONFIGURATION ####
@@ -30,8 +30,8 @@ from spython.main import run
 # Set to target of scripts/download_all_databases.sh
 DOWNLOAD_DIR = 'SET ME'
 
-# Name of the AlphaFold Docker image.
-docker_image_name = 'alphafold'
+# Name of the AlphaFold singularity image.
+singularity_image_name = 'alphafold'
 
 # Path to a directory that will store the results.
 output_dir = '/tmp/alphafold'
@@ -107,12 +107,12 @@ FLAGS = flags.FLAGS
 _ROOT_MOUNT_DIRECTORY = '/mnt/'
 
 
-def _create_mount(mount_name: str, path: str) -> Tuple[types.Mount, str]:
+def _create_mount(mount_name: str, path: str) -> Tuple[List[str], str]:
     path = os.path.abspath(path)
     source_path = os.path.dirname(path)
     target_path = os.path.join(_ROOT_MOUNT_DIRECTORY, mount_name)
     logging.info('Mounting %s -> %s', source_path, target_path)
-    mount = types.Mount(target_path, source_path, type='bind', read_only=True)
+    mount = f'{target_path}:{source_path}'
     return mount, os.path.join(target_path, os.path.basename(path))
 
 
@@ -145,7 +145,7 @@ def main(argv):
             command_args.append(f'--{name}={target_path}')
 
     output_target_path = os.path.join(_ROOT_MOUNT_DIRECTORY, 'output')
-    mounts.append(types.Mount(output_target_path, output_dir, type='bind'))
+    mounts.append(f'{output_target_path}, {output_dir}')
 
     command_args.extend([
         f'--output_dir={output_target_path}',
@@ -156,12 +156,12 @@ def main(argv):
         '--logtostderr',
     ])
 
-    container = run.run(
-        image=docker_image_name,
-        args=command_args,
+    container = execute.execute(
+        image=singularity_image_name,
+        command=command_args,
         bind=mounts,
-        nv=True,
-        options={
+        nv=FLAGS.use_gpu,
+        environ={
             'NVIDIA_VISIBLE_DEVICES': FLAGS.gpu_devices,
             # The following flags allow us to make predictions on proteins that
             # would typically be too long to fit into GPU memory.
