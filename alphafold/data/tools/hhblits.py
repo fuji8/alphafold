@@ -144,10 +144,10 @@ class HHBlits:
             stdout.decode('utf-8'), stderr[:500_000].decode('utf-8')))
       else:
         with open('hhblits.stdout', mode='w') as f:
-          f.write(stdout.decode('utf-8').splitlines())
+          f.write(stdout.decode('utf-8'))
 
         with open('hhblits.stderr', mode='w') as f:
-          f.write(stderr.decode('utf-8').splitlines())
+          f.write(stderr.decode('utf-8'))
 
       with open(a3m_path) as f:
         a3m = f.read()
