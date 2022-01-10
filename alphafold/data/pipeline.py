@@ -25,6 +25,10 @@ from alphafold.data.tools import hhsearch
 from alphafold.data.tools import jackhmmer
 import numpy as np
 
+import concurrent.futures
+
+from alphafold.model import features
+
 # Internal import (7716).
 
 FeatureDict = Mapping[str, np.ndarray]
@@ -118,6 +122,51 @@ class DataPipeline:
     self.mgnify_max_hits = mgnify_max_hits
     self.uniref_max_hits = uniref_max_hits
 
+  def jackhmmer_uniref90_hhsearch_caller(self, input_fasta_path, msa_output_dir):
+    jackhmmer_uniref90_result = self.jackhmmer_uniref90_runner.query(input_fasta_path)
+    uniref90_msa_as_a3m = parsers.convert_stockholm_to_a3m(
+        jackhmmer_uniref90_result["sto"], max_sequences=self.uniref_max_hits
+    )
+    hhsearch_result = self.hhsearch_pdb70_runner.query(uniref90_msa_as_a3m)
+
+    uniref90_out_path = os.path.join(msa_output_dir, 'uniref90_hits.sto')
+    with open(uniref90_out_path, 'w') as f:
+        f.write(jackhmmer_uniref90_result['sto'])
+
+    uniref90_msa, uniref90_deletion_matrix, _ = parsers.parse_stockholm(
+        jackhmmer_uniref90_result['sto'])
+ 
+    pdb70_out_path = os.path.join(msa_output_dir, 'pdb70_hits.hhr')
+    with open(pdb70_out_path, 'w') as f:
+        f.write(hhsearch_result)
+    hhsearch_hits = parsers.parse_hhr(hhsearch_result)
+
+    return uniref90_msa, uniref90_deletion_matrix, hhsearch_hits
+
+  def jackhmmer_mgnify_caller(self, input_fasta_path, msa_output_dir):
+    jackhmmer_mgnify_result = self.jackhmmer_mgnify_runner.query(input_fasta_path)
+    mgnify_out_path = os.path.join(msa_output_dir, 'mgnify_hits.sto')
+    with open(mgnify_out_path, 'w') as f:
+      f.write(jackhmmer_mgnify_result['sto'])
+
+    mgnify_msa, mgnify_deletion_matrix, _ = parsers.parse_stockholm(
+        jackhmmer_mgnify_result['sto'])
+    mgnify_msa = mgnify_msa[:self.mgnify_max_hits]
+    mgnify_deletion_matrix = mgnify_deletion_matrix[:self.mgnify_max_hits]
+
+    return mgnify_msa, mgnify_deletion_matrix
+
+  def hhblits_caller(self, input_fasta_path, msa_output_dir):
+    hhblits_bfd_uniclust_result = self.hhblits_bfd_uniclust_runner.query(input_fasta_path)
+    bfd_out_path = os.path.join(msa_output_dir, 'bfd_uniclust_hits.a3m')
+    with open(bfd_out_path, 'w') as f:
+      f.write(hhblits_bfd_uniclust_result['a3m'])
+
+    bfd_msa, bfd_deletion_matrix = parsers.parse_a3m(
+        hhblits_bfd_uniclust_result['a3m'])
+
+    return bfd_msa, bfd_deletion_matrix
+
   def process(self, input_fasta_path: str, msa_output_dir: str) -> FeatureDict:
     """Runs alignment tools on the input sequence and creates features."""
     with open(input_fasta_path) as f:
@@ -130,36 +179,11 @@ class DataPipeline:
     input_description = input_descs[0]
     num_res = len(input_sequence)
 
-    jackhmmer_uniref90_result = self.jackhmmer_uniref90_runner.query(
-        input_fasta_path)[0]
-    jackhmmer_mgnify_result = self.jackhmmer_mgnify_runner.query(
-        input_fasta_path)[0]
-
-    uniref90_msa_as_a3m = parsers.convert_stockholm_to_a3m(
-        jackhmmer_uniref90_result['sto'], max_sequences=self.uniref_max_hits)
-    hhsearch_result = self.hhsearch_pdb70_runner.query(uniref90_msa_as_a3m)
-
-    uniref90_out_path = os.path.join(msa_output_dir, 'uniref90_hits.sto')
-    with open(uniref90_out_path, 'w') as f:
-      f.write(jackhmmer_uniref90_result['sto'])
-
-    mgnify_out_path = os.path.join(msa_output_dir, 'mgnify_hits.sto')
-    with open(mgnify_out_path, 'w') as f:
-      f.write(jackhmmer_mgnify_result['sto'])
-
-    pdb70_out_path = os.path.join(msa_output_dir, 'pdb70_hits.hhr')
-    with open(pdb70_out_path, 'w') as f:
-      f.write(hhsearch_result)
-
-    uniref90_msa, uniref90_deletion_matrix, _ = parsers.parse_stockholm(
-        jackhmmer_uniref90_result['sto'])
-    mgnify_msa, mgnify_deletion_matrix, _ = parsers.parse_stockholm(
-        jackhmmer_mgnify_result['sto'])
-    hhsearch_hits = parsers.parse_hhr(hhsearch_result)
-    mgnify_msa = mgnify_msa[:self.mgnify_max_hits]
-    mgnify_deletion_matrix = mgnify_deletion_matrix[:self.mgnify_max_hits]
-
+    futures = []
     if self._use_small_bfd:
+      raise ValueError(
+        "bfd_small is not implemented"
+      )
       jackhmmer_small_bfd_result = self.jackhmmer_small_bfd_runner.query(
           input_fasta_path)[0]
 
@@ -170,15 +194,14 @@ class DataPipeline:
       bfd_msa, bfd_deletion_matrix, _ = parsers.parse_stockholm(
           jackhmmer_small_bfd_result['sto'])
     else:
-      hhblits_bfd_uniclust_result = self.hhblits_bfd_uniclust_runner.query(
-          input_fasta_path)
-
-      bfd_out_path = os.path.join(msa_output_dir, 'bfd_uniclust_hits.a3m')
-      with open(bfd_out_path, 'w') as f:
-        f.write(hhblits_bfd_uniclust_result['a3m'])
-
-      bfd_msa, bfd_deletion_matrix = parsers.parse_a3m(
-          hhblits_bfd_uniclust_result['a3m'])
+      with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        futures.append(executor.submit(self.jackhmmer_uniref90_hhsearch_caller, input_fasta_path, msa_output_dir))
+        futures.append(executor.submit(self.jackhmmer_mgnify_caller, input_fasta_path, msa_output_dir))
+        futures.append(executor.submit(self.hhblits_caller, input_fasta_path, msa_output_dir))
+    
+    uniref90_msa, uniref90_deletion_matrix, hhsearch_hits = features[0].result()
+    mgnify_msa, mgnify_deletion_matrix = features[1].result()
+    bfd_msa, bfd_deletion_matrix = features[2].result()
 
     templates_result = self.template_featurizer.get_templates(
         query_sequence=input_sequence,
