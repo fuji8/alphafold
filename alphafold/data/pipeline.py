@@ -123,10 +123,9 @@ class DataPipeline:
     self.uniref_max_hits = uniref_max_hits
 
   def jackhmmer_uniref90_hhsearch_caller(self, input_fasta_path, msa_output_dir):
-    jackhmmer_uniref90_result = self.jackhmmer_uniref90_runner.query(input_fasta_path)
+    jackhmmer_uniref90_result = self.jackhmmer_uniref90_runner.query(input_fasta_path)[0]
     uniref90_msa_as_a3m = parsers.convert_stockholm_to_a3m(
-        jackhmmer_uniref90_result["sto"], max_sequences=self.uniref_max_hits
-    )
+        jackhmmer_uniref90_result["sto"], max_sequences=self.uniref_max_hits)
     hhsearch_result = self.hhsearch_pdb70_runner.query(uniref90_msa_as_a3m)
 
     uniref90_out_path = os.path.join(msa_output_dir, 'uniref90_hits.sto')
@@ -144,7 +143,7 @@ class DataPipeline:
     return uniref90_msa, uniref90_deletion_matrix, hhsearch_hits
 
   def jackhmmer_mgnify_caller(self, input_fasta_path, msa_output_dir):
-    jackhmmer_mgnify_result = self.jackhmmer_mgnify_runner.query(input_fasta_path)
+    jackhmmer_mgnify_result = self.jackhmmer_mgnify_runner.query(input_fasta_path)[0]
     mgnify_out_path = os.path.join(msa_output_dir, 'mgnify_hits.sto')
     with open(mgnify_out_path, 'w') as f:
       f.write(jackhmmer_mgnify_result['sto'])
