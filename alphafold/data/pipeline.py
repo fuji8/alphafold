@@ -194,7 +194,7 @@ class DataPipeline:
       bfd_msa, bfd_deletion_matrix, _ = parsers.parse_stockholm(
           jackhmmer_small_bfd_result['sto'])
     else:
-      with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+      with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures.append(executor.submit(self.jackhmmer_uniref90_hhsearch_caller, input_fasta_path, msa_output_dir))
         futures.append(executor.submit(self.jackhmmer_mgnify_caller, input_fasta_path, msa_output_dir))
         futures.append(executor.submit(self.hhblits_caller, input_fasta_path, msa_output_dir))
