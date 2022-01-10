@@ -199,9 +199,9 @@ class DataPipeline:
         futures.append(executor.submit(self.jackhmmer_mgnify_caller, input_fasta_path, msa_output_dir))
         futures.append(executor.submit(self.hhblits_caller, input_fasta_path, msa_output_dir))
     
-    uniref90_msa, uniref90_deletion_matrix, hhsearch_hits = features[0].result()
-    mgnify_msa, mgnify_deletion_matrix = features[1].result()
-    bfd_msa, bfd_deletion_matrix = features[2].result()
+    uniref90_msa, uniref90_deletion_matrix, hhsearch_hits = futures[0].result()
+    mgnify_msa, mgnify_deletion_matrix = futures[1].result()
+    bfd_msa, bfd_deletion_matrix = futures[2].result()
 
     templates_result = self.template_featurizer.get_templates(
         query_sequence=input_sequence,
