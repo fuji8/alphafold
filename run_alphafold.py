@@ -36,7 +36,7 @@ from alphafold.data.tools import hmmsearch
 from alphafold.model import config
 from alphafold.model import model
 from alphafold.relax import relax
-from flag_flag import FLAGS
+import flag_flag
 import numpy as np
 
 from alphafold.model import data
@@ -118,7 +118,7 @@ flags.DEFINE_boolean('use_precomputed_msas', False, 'Whether to read MSAs that '
                      'have been written to disk. WARNING: This will not check '
                      'if the sequence, database or configuration have changed.')
 
-FLAGS = flags.FLAGS
+flag_flag.FLAGS = flags.FLAGS
 
 MAX_TEMPLATE_HITS = 20
 RELAX_MAX_ITERATIONS = 0
@@ -131,10 +131,10 @@ RELAX_MAX_OUTER_ITERATIONS = 3
 def _check_flag(flag_name: str,
                 other_flag_name: str,
                 should_be_set: bool):
-  if should_be_set != bool(FLAGS[flag_name].value):
+  if should_be_set != bool(flag_flag.FLAGS[flag_name].value):
     verb = 'be' if should_be_set else 'not be'
     raise ValueError(f'{flag_name} must {verb} set when running with '
-                     f'"--{other_flag_name}={FLAGS[other_flag_name].value}".')
+                     f'"--{other_flag_name}={flag_flag.FLAGS[other_flag_name].value}".')
 
 
 def predict_structure(
@@ -277,11 +277,11 @@ def main(argv):
 
   for tool_name in (
       'jackhmmer', 'hhblits', 'hhsearch', 'hmmsearch', 'hmmbuild', 'kalign'):
-    if not FLAGS[f'{tool_name}_binary_path'].value:
+    if not flag_flag.FLAGS[f'{tool_name}_binary_path'].value:
       raise ValueError(f'Could not find path to the "{tool_name}" binary. Make '
                        'sure it is installed on your system.')
 
-  use_small_bfd = FLAGS.db_preset == 'reduced_dbs'
+  use_small_bfd = flag_flag.FLAGS.db_preset == 'reduced_dbs'
   _check_flag('small_bfd_database_path', 'db_preset',
               should_be_set=use_small_bfd)
   _check_flag('bfd_database_path', 'db_preset',
@@ -289,7 +289,7 @@ def main(argv):
   _check_flag('uniclust30_database_path', 'db_preset',
               should_be_set=not use_small_bfd)
 
-  run_multimer_system = 'multimer' in FLAGS.model_preset
+  run_multimer_system = 'multimer' in flag_flag.FLAGS.model_preset
   _check_flag('pdb70_database_path', 'model_preset',
               should_be_set=not run_multimer_system)
   _check_flag('pdb_seqres_database_path', 'model_preset',
@@ -297,24 +297,24 @@ def main(argv):
   _check_flag('uniprot_database_path', 'model_preset',
               should_be_set=run_multimer_system)
 
-  if FLAGS.model_preset == 'monomer_casp14':
+  if flag_flag.FLAGS.model_preset == 'monomer_casp14':
     num_ensemble = 8
   else:
     num_ensemble = 1
 
   # Check for duplicate FASTA file names.
-  fasta_names = [pathlib.Path(p).stem for p in FLAGS.fasta_paths]
+  fasta_names = [pathlib.Path(p).stem for p in flag_flag.FLAGS.fasta_paths]
   if len(fasta_names) != len(set(fasta_names)):
     raise ValueError('All FASTA paths must have a unique basename.')
 
   # Check that is_prokaryote_list has same number of elements as fasta_paths,
   # and convert to bool.
-  if FLAGS.is_prokaryote_list:
-    if len(FLAGS.is_prokaryote_list) != len(FLAGS.fasta_paths):
+  if flag_flag.FLAGS.is_prokaryote_list:
+    if len(flag_flag.FLAGS.is_prokaryote_list) != len(flag_flag.FLAGS.fasta_paths):
       raise ValueError('--is_prokaryote_list must either be omitted or match '
                        'length of --fasta_paths.')
     is_prokaryote_list = []
-    for s in FLAGS.is_prokaryote_list:
+    for s in flag_flag.FLAGS.is_prokaryote_list:
       if s in ('true', 'false'):
         is_prokaryote_list.append(s == 'true')
       else:
@@ -325,52 +325,52 @@ def main(argv):
 
   if run_multimer_system:
     template_searcher = hmmsearch.Hmmsearch(
-        binary_path=FLAGS.hmmsearch_binary_path,
-        hmmbuild_binary_path=FLAGS.hmmbuild_binary_path,
-        database_path=FLAGS.pdb_seqres_database_path)
+        binary_path=flag_flag.FLAGS.hmmsearch_binary_path,
+        hmmbuild_binary_path=flag_flag.FLAGS.hmmbuild_binary_path,
+        database_path=flag_flag.FLAGS.pdb_seqres_database_path)
     template_featurizer = templates.HmmsearchHitFeaturizer(
-        mmcif_dir=FLAGS.template_mmcif_dir,
-        max_template_date=FLAGS.max_template_date,
+        mmcif_dir=flag_flag.FLAGS.template_mmcif_dir,
+        max_template_date=flag_flag.FLAGS.max_template_date,
         max_hits=MAX_TEMPLATE_HITS,
-        kalign_binary_path=FLAGS.kalign_binary_path,
+        kalign_binary_path=flag_flag.FLAGS.kalign_binary_path,
         release_dates_path=None,
-        obsolete_pdbs_path=FLAGS.obsolete_pdbs_path)
+        obsolete_pdbs_path=flag_flag.FLAGS.obsolete_pdbs_path)
   else:
     template_searcher = hhsearch.HHSearch(
-        binary_path=FLAGS.hhsearch_binary_path,
-        databases=[FLAGS.pdb70_database_path])
+        binary_path=flag_flag.FLAGS.hhsearch_binary_path,
+        databases=[flag_flag.FLAGS.pdb70_database_path])
     template_featurizer = templates.HhsearchHitFeaturizer(
-        mmcif_dir=FLAGS.template_mmcif_dir,
-        max_template_date=FLAGS.max_template_date,
+        mmcif_dir=flag_flag.FLAGS.template_mmcif_dir,
+        max_template_date=flag_flag.FLAGS.max_template_date,
         max_hits=MAX_TEMPLATE_HITS,
-        kalign_binary_path=FLAGS.kalign_binary_path,
+        kalign_binary_path=flag_flag.FLAGS.kalign_binary_path,
         release_dates_path=None,
-        obsolete_pdbs_path=FLAGS.obsolete_pdbs_path)
+        obsolete_pdbs_path=flag_flag.FLAGS.obsolete_pdbs_path)
 
   monomer_data_pipeline = pipeline.DataPipeline(
-      jackhmmer_binary_path=FLAGS.jackhmmer_binary_path,
-      hhblits_binary_path=FLAGS.hhblits_binary_path,
-      uniref90_database_path=FLAGS.uniref90_database_path,
-      mgnify_database_path=FLAGS.mgnify_database_path,
-      bfd_database_path=FLAGS.bfd_database_path,
-      uniclust30_database_path=FLAGS.uniclust30_database_path,
-      small_bfd_database_path=FLAGS.small_bfd_database_path,
+      jackhmmer_binary_path=flag_flag.FLAGS.jackhmmer_binary_path,
+      hhblits_binary_path=flag_flag.FLAGS.hhblits_binary_path,
+      uniref90_database_path=flag_flag.FLAGS.uniref90_database_path,
+      mgnify_database_path=flag_flag.FLAGS.mgnify_database_path,
+      bfd_database_path=flag_flag.FLAGS.bfd_database_path,
+      uniclust30_database_path=flag_flag.FLAGS.uniclust30_database_path,
+      small_bfd_database_path=flag_flag.FLAGS.small_bfd_database_path,
       template_searcher=template_searcher,
       template_featurizer=template_featurizer,
       use_small_bfd=use_small_bfd,
-      use_precomputed_msas=FLAGS.use_precomputed_msas)
+      use_precomputed_msas=flag_flag.FLAGS.use_precomputed_msas)
 
   if run_multimer_system:
     data_pipeline = pipeline_multimer.DataPipeline(
         monomer_data_pipeline=monomer_data_pipeline,
-        jackhmmer_binary_path=FLAGS.jackhmmer_binary_path,
-        uniprot_database_path=FLAGS.uniprot_database_path,
-        use_precomputed_msas=FLAGS.use_precomputed_msas)
+        jackhmmer_binary_path=flag_flag.FLAGS.jackhmmer_binary_path,
+        uniprot_database_path=flag_flag.FLAGS.uniprot_database_path,
+        use_precomputed_msas=flag_flag.FLAGS.use_precomputed_msas)
   else:
     data_pipeline = monomer_data_pipeline
 
   model_runners = {}
-  model_names = config.MODEL_PRESETS[FLAGS.model_preset]
+  model_names = config.MODEL_PRESETS[flag_flag.FLAGS.model_preset]
   for model_name in model_names:
     model_config = config.model_config(model_name)
     if run_multimer_system:
@@ -378,7 +378,7 @@ def main(argv):
     else:
       model_config.data.eval.num_ensemble = num_ensemble
     model_params = data.get_model_haiku_params(
-        model_name=model_name, data_dir=FLAGS.data_dir)
+        model_name=model_name, data_dir=flag_flag.FLAGS.data_dir)
     model_runner = model.RunModel(model_config, model_params)
     model_runners[model_name] = model_runner
 
@@ -392,23 +392,23 @@ def main(argv):
       exclude_residues=RELAX_EXCLUDE_RESIDUES,
       max_outer_iterations=RELAX_MAX_OUTER_ITERATIONS)
 
-  random_seed = FLAGS.random_seed
+  random_seed = flag_flag.FLAGS.random_seed
   if random_seed is None:
     random_seed = random.randrange(sys.maxsize // len(model_names))
   logging.info('Using random seed %d for the data pipeline', random_seed)
 
   # Predict structure for each of the sequences.
-  for i, fasta_path in enumerate(FLAGS.fasta_paths):
+  for i, fasta_path in enumerate(flag_flag.FLAGS.fasta_paths):
     is_prokaryote = is_prokaryote_list[i] if run_multimer_system else None
     fasta_name = fasta_names[i]
     predict_structure(
         fasta_path=fasta_path,
         fasta_name=fasta_name,
-        output_dir_base=FLAGS.output_dir,
+        output_dir_base=flag_flag.FLAGS.output_dir,
         data_pipeline=data_pipeline,
         model_runners=model_runners,
         amber_relaxer=amber_relaxer,
-        benchmark=FLAGS.benchmark,
+        benchmark=flag_flag.FLAGS.benchmark,
         random_seed=random_seed,
         is_prokaryote=is_prokaryote)
 
