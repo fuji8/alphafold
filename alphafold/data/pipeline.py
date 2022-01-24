@@ -211,7 +211,7 @@ class DataPipeline:
     input_description = input_descs[0]
     num_res = len(input_sequence)
 
-
+    futures = []
     if self._use_small_bfd:
       raise ValueError(
         "small_bfd is not implemented"
@@ -223,13 +223,13 @@ class DataPipeline:
       bfd_msa = parsers.parse_stockholm(jackhmmer_small_bfd_result['sto'])
     else:
       with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        concurrent.futures.append(executor.submit(self.jackhmmer_uniref90_hhsearch_caller, input_fasta_path, msa_output_dir, input_sequence))
-        concurrent.futures.append(executor.submit(self.jackhmmer_mgnify_caller, input_fasta_path, msa_output_dir))
-        concurrent.futures.append(executor.submit(self.hhblits_caller, input_fasta_path, msa_output_dir))
+        futures.append(executor.submit(self.jackhmmer_uniref90_hhsearch_caller, input_fasta_path, msa_output_dir, input_sequence))
+        futures.append(executor.submit(self.jackhmmer_mgnify_caller, input_fasta_path, msa_output_dir))
+        futures.append(executor.submit(self.hhblits_caller, input_fasta_path, msa_output_dir))
 
-    uniref90_msa, pdb_template_hits = concurrent.futures[0].result()
-    mgnify_msa = concurrent.futures[1].result()
-    bfd_msa = concurrent.futures[2].result()
+    uniref90_msa, pdb_template_hits = futures[0].result()
+    mgnify_msa = futures[1].result()
+    bfd_msa = futures[2].result()
 
     templates_result = self.template_featurizer.get_templates(
         query_sequence=input_sequence,
