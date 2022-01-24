@@ -36,6 +36,7 @@ from alphafold.data.tools import hmmsearch
 from alphafold.model import config
 from alphafold.model import model
 from alphafold.relax import relax
+from flag_flag import FLAGS
 import numpy as np
 
 from alphafold.model import data

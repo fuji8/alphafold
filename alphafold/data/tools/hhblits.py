@@ -21,7 +21,7 @@ from typing import Any, List, Mapping, Optional, Sequence
 
 from absl import logging
 from alphafold.data.tools import utils
-from run_alphafold import FLAGS
+from flag_flag import FLAGS
 # Internal import (7716).
 
 
