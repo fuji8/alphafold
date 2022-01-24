@@ -145,7 +145,7 @@ class HHBlits:
         raise RuntimeError('HHblits failed\nstdout:\n%s\n\nstderr:\n%s\n' % (
             stdout.decode('utf-8'), stderr[:500_000].decode('utf-8')))
       else:
-        output_dirname = re.findall('(T.+).fasta', input_fasta_path)
+        output_dirname = re.findall('(T.+).fasta', input_fasta_path)[0]
         with open(f'results/{output_dirname}/hhblits.stdout', mode='w') as f:
           f.write(stdout.decode('utf-8'))
 
