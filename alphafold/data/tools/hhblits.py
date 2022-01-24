@@ -21,6 +21,7 @@ from typing import Any, List, Mapping, Optional, Sequence
 
 from absl import logging
 from alphafold.data.tools import utils
+from run_alphafold import FLAGS
 # Internal import (7716).
 
 
@@ -143,10 +144,10 @@ class HHBlits:
         raise RuntimeError('HHblits failed\nstdout:\n%s\n\nstderr:\n%s\n' % (
             stdout.decode('utf-8'), stderr[:500_000].decode('utf-8')))
       else:
-        with open('hhblits.stdout', mode='w') as f:
+        with open(f'{FLAGS.output_dir}/hhblits.stdout', mode='w') as f:
           f.write(stdout.decode('utf-8'))
 
-        with open('hhblits.stderr', mode='w') as f:
+        with open(f'{FLAGS.output_dir}/hhblits.stderr', mode='w') as f:
           f.write(stderr.decode('utf-8'))
 
       with open(a3m_path) as f:
