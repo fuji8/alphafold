@@ -16,6 +16,7 @@
 
 import glob
 import os
+import re
 import subprocess
 from typing import Any, List, Mapping, Optional, Sequence
 
@@ -144,10 +145,11 @@ class HHBlits:
         raise RuntimeError('HHblits failed\nstdout:\n%s\n\nstderr:\n%s\n' % (
             stdout.decode('utf-8'), stderr[:500_000].decode('utf-8')))
       else:
-        with open(f'{FLAGS.output_dir}/hhblits.stdout', mode='w') as f:
+        output_dirname = re.findall('(T.+).fasta', input_fasta_path)
+        with open(f'results/{output_dirname}/hhblits.stdout', mode='w') as f:
           f.write(stdout.decode('utf-8'))
 
-        with open(f'{FLAGS.output_dir}/hhblits.stderr', mode='w') as f:
+        with open(f'results/{output_dirname}/hhblits.stderr', mode='w') as f:
           f.write(stderr.decode('utf-8'))
 
       with open(a3m_path) as f:
