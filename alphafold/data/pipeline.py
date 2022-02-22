@@ -154,8 +154,9 @@ class DataPipeline:
     self.mgnify_max_hits = mgnify_max_hits
     self.uniref_max_hits = uniref_max_hits
     self.use_precomputed_msas = use_precomputed_msas
+    self.n_parallel_msa = n_parallel_msa
 
-  def jackhmmer_uniref90_hhsearch_caller(self, input_fasta_path, msa_output_dir, input_sequence):
+  def jackhmmer_uniref90_and_pdb_templates_caller(self, input_fasta_path, msa_output_dir, input_sequence):
     uniref90_out_path = os.path.join(msa_output_dir, 'uniref90_hits.sto')
     jackhmmer_uniref90_result = run_msa_tool(
         self.jackhmmer_uniref90_runner, input_fasta_path, uniref90_out_path,
@@ -197,12 +198,23 @@ class DataPipeline:
     mgnify_msa = mgnify_msa.truncate(max_seqs=self.mgnify_max_hits)
     return mgnify_msa
 
-  def hhblits_caller(self, input_fasta_path, msa_output_dir):
+  def hhblits_bfd_uniclust_caller(self, input_fasta_path, msa_output_dir):
     bfd_out_path = os.path.join(msa_output_dir, 'bfd_uniclust_hits.a3m')
     hhblits_bfd_uniclust_result = run_msa_tool(
         self.hhblits_bfd_uniclust_runner, input_fasta_path, bfd_out_path,
         'a3m', self.use_precomputed_msas)
     bfd_msa = parsers.parse_a3m(hhblits_bfd_uniclust_result['a3m'])
+    return bfd_msa
+
+  def jackhmmer_small_bfd_caller(self, input_fasta_path, msa_output_dir):
+    bfd_out_path = os.path.join(msa_output_dir, 'small_bfd_hits.sto')
+    jackhmmer_small_bfd_result = run_msa_tool(
+        msa_runner=self.jackhmmer_small_bfd_runner,
+        input_fasta_path=input_fasta_path,
+        msa_out_path=bfd_out_path,
+        msa_format='sto',
+        use_precomputed_msas=self.use_precomputed_msas)
+    bfd_msa = parsers.parse_stockholm(jackhmmer_small_bfd_result['sto'])
     return bfd_msa
 
 
@@ -220,22 +232,15 @@ class DataPipeline:
 
 
     if self._use_small_bfd:
-      raise ValueError(
-        "small_bfd is not implemented"
-      )
-      bfd_out_path = os.path.join(msa_output_dir, 'small_bfd_hits.sto')
-      jackhmmer_small_bfd_result = run_msa_tool(
-          msa_runner=self.jackhmmer_small_bfd_runner,
-          input_fasta_path=input_fasta_path,
-          msa_out_path=bfd_out_path,
-          msa_format='sto',
-          use_precomputed_msas=self.use_precomputed_msas)
-      bfd_msa = parsers.parse_stockholm(jackhmmer_small_bfd_result['sto'])
-    else:
-      with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        concurrent.futures.append(executor.submit(self.jackhmmer_uniref90_hhsearch_caller, input_fasta_path, msa_output_dir, input_sequence))
+      with concurrent.futures.ThreadPoolExecutor(max_workers=self.n_parallel_msa) as executor:
+        concurrent.futures.append(executor.submit(self.jackhmmer_uniref90_and_pdb_templates_caller, input_fasta_path, msa_output_dir, input_sequence))
         concurrent.futures.append(executor.submit(self.jackhmmer_mgnify_caller, input_fasta_path, msa_output_dir))
-        concurrent.futures.append(executor.submit(self.hhblits_caller, input_fasta_path, msa_output_dir))
+        concurrent.futures.append(executor.submit(self.jackhmmer_small_bfd_caller, input_fasta_path, msa_output_dir))
+    else:
+      with concurrent.futures.ThreadPoolExecutor(max_workers=self.n_parallel_msa) as executor:
+        concurrent.futures.append(executor.submit(self.jackhmmer_uniref90_and_pdb_templates_caller, input_fasta_path, msa_output_dir, input_sequence))
+        concurrent.futures.append(executor.submit(self.jackhmmer_mgnify_caller, input_fasta_path, msa_output_dir))
+        concurrent.futures.append(executor.submit(self.hhblits_bfd_uniclust_caller, input_fasta_path, msa_output_dir))
 
     uniref90_msa, pdb_template_hits = concurrent.futures[0].result()
     mgnify_msa = concurrent.futures[1].result()
